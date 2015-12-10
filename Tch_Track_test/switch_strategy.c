@@ -731,7 +731,7 @@ int first_PicMode(MainEnc_FirstPicMode_t *fpm, Track_Strategy_t *track_stra)
 		sysData->result_activity = 0;
 		sysData->timer_stra.start = gettime();
 		sysData->display_time = fpm->display_time;
-		return 1;
+		return 0;
 	}
 	else
 		return -1;
@@ -740,12 +740,10 @@ int first_PicMode(MainEnc_FirstPicMode_t *fpm, Track_Strategy_t *track_stra)
 int init_track_strategy(Track_Strategy_t *track_stra)
 {
     Strategy_sysData_t *sysData=(Strategy_sysData_t *)(track_stra->sysData);
-    if(track_stra->isInit==0)
-    {
-        init_cam(sysData->tch_cam);
-	init_cam(sysData->stu_cam);
-        
-    }
+
+    init_cam(sysData->tch_cam);
+    init_cam(sysData->stu_cam);
+
 	
 #ifdef WIN32
 	int iResult = 0;
@@ -759,4 +757,17 @@ int init_track_strategy(Track_Strategy_t *track_stra)
 	init_strategy(sysData);
 	//return switch_strategy(track_stra,stra_res);
         return 0;
+}
+
+int destroy_track_strategy(Track_Strategy_t *track_stra)
+{
+    if(track_stra==NULL||stra_res==NULL)
+    {
+        return -1;
+    }
+    Strategy_sysData_t *sysData=(Strategy_sysData_t *)(track_stra->sysData);
+    close_cam(sysData->tch_cam);
+    close_cam(sysData->stu_cam);
+    DestroyQueue(sysData->tch_que);
+    return 0;
 }

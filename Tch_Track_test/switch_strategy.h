@@ -101,7 +101,8 @@ typedef struct Strategy_Result
 
 	//TrackPrarms_Point_t stu_pos;//学生坐标
 	int status;//画面状态的指令
-	int last_status;//上一次的画面状态
+	int last_status;
+        //上一次的画面状态
 	//int posit_pan; //相机水平坐标
 	//int posit_tilt; //相机垂直坐标
 	//Strategy_Timer_t timer_stra;//计时器
@@ -135,14 +136,14 @@ typedef struct Strategy_sysData
 
 typedef struct Track_Strategy
 {
-        int isInit;//是否初始化的标识符
+        //int isInit;//是否初始化的标识符
 	char *tch_ip;//教师相机的ip
 	char *stu_ip;//学生相机的ip
 	int tch_port;//教师相机的端口
 	int stu_port;//学生相机的端口
 	AlgLink_ScdResult *vga;//vga结构体
 	Tch_Result_t *tch;//教师结果结构体
-	StuITRACK_OutParams_t *stu;
+	StuITRACK_OutParams_t *stu;//学生结果结构体
         void *sysData;
         //学生结果结构体
 	//Strategy_CamControl_t *tch_cam;//教师相机
@@ -150,20 +151,55 @@ typedef struct Track_Strategy
 }Track_Strategy_t;
 
 /*==============================================================================
-    函数: <DB_array_RcdStartTime>
-    功能: 以RcdStartTime排序
-    参数:p_xml :-返回排序后的xml,使用后需要销毁
-    返回值:0-成功   否则失败
+    函数: <switch_strategy>
+    功能: 获取决策结果
+    参数:track_stra :已经初始化的决策器
+ *          char *tch_ip;//教师相机的ip
+            char *stu_ip;//学生相机的ip
+            int tch_port;//教师相机的端口
+            int stu_port;//学生相机的端口
+            AlgLink_ScdResult *vga;//vga结构体
+            Tch_Result_t *tch;//教师结果结构体
+            StuITRACK_OutParams_t *stu;//学生结果结构体
+         stra_res   :决策的结果
+ *          int status;//画面状态的指令
+ *          int last_status;//上一次画面状态的指令
+    返回值:非0-决策代码   否则无决策
 ==============================================================================*/
 int switch_strategy(Track_Strategy_t *track_stra, Strategy_Result_t *stra_res);
 
 /*==============================================================================
     函数: <init_track_strategy>
-    功能: 初始化
-    参数:p_xml :-返回排序后的xml,使用后需要销毁
+    功能: 初始化决策器
+    参数:track_stra :
+        char *tch_ip;//教师相机的ip
+	char *stu_ip;//学生相机的ip
+	int tch_port;//教师相机的端口
+	int stu_port;//学生相机的端口
+	AlgLink_ScdResult *vga;//vga结构体
+	Tch_Result_t *tch;//教师结果结构体
+	StuITRACK_OutParams_t *stu;//学生结果结构体
     返回值:0-成功   否则失败
 ==============================================================================*/
 int init_track_strategy(Track_Strategy_t *track_stra);
+
+/*==============================================================================
+    函数: <destroy_track_strategy>
+    功能: 摧毁决策器
+    参数:track_stra :
+    返回值:0-成功   否则失败
+==============================================================================*/
+int destroy_track_strategy(Track_Strategy_t *track_stra);
+
+/*==============================================================================
+    函数: <first_PicMode>
+    功能: 设置录制初始画面
+    参数:fpm :
+        int option;//设置或者获取
+	int firstpicture;
+	int display_time;
+    返回值:0-成功   否则失败
+==============================================================================*/
 int first_PicMode(MainEnc_FirstPicMode_t *fpm, Track_Strategy_t *track_stra);
 #ifdef __cplusplus
 }
