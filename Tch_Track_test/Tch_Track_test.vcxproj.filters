@@ -51,6 +51,9 @@
     <ClInclude Include="Strategy_cameraControl.h">
       <Filter>头文件</Filter>
     </ClInclude>
+    <ClInclude Include="scdLink.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="itcCore.c">
@@ -74,10 +77,10 @@
     <ClCompile Include="tch_track.c">
       <Filter>源文件</Filter>
     </ClCompile>
-    <ClCompile Include="main.c">
+    <ClCompile Include="Strategy_cameraControl.c">
       <Filter>源文件</Filter>
     </ClCompile>
-    <ClCompile Include="Strategy_cameraControl.c">
+    <ClCompile Include="main.c">
       <Filter>源文件</Filter>
     </ClCompile>
   </ItemGroup>

@@ -1,7 +1,7 @@
 //#include "stdafx.h"
 
-#ifndef CLIENT_CAMERACONTROL_H
-#define CLIENT_CAMERACONTROL_H
+#ifndef STTATEGY_CAMERACONTROL_H
+#define STTATEGY_CAMERACONTROL_H
 
 #include <errno.h>
 #include <stdio.h>
@@ -10,13 +10,33 @@
 #include <time.h>
 
 #ifdef WIN32
-	#include "winsock.h"
-	#pragma comment(lib, "ws2_32.lib")
-	#include "pthread.h"
+	#include "WS2tcpip.h"
+    #pragma comment(lib, "ws2_32.lib")
+    #include "pthread.h"
 #else
-	#include <pthread.h>
+    #include <pthread.h>
+	#include <sys/socket.h>
+	#include <net/if.h>
+	#include <netinet/in.h>
+	#include <sys/types.h>
+	#include <unistd.h>
+	#include <arpa/inet.h>
 #endif
 
+
+#ifdef  __cplusplus
+extern "C" {
+#endif
+#ifndef TRUE
+#define TRUE 1
+#endif
+
+#ifndef FALSE
+#define FALSE 0
+#endif
+
+typedef   int BOOL;
+typedef  void* HANDLE;
 
 ///UDPøÿ÷∆∂®“Â
 #define PANandTILT_CTRL_PTZ_STOP            0x1000
@@ -55,8 +75,8 @@ typedef struct CameraControl
 	int m_addr_len;
 	int m_send_socket;
 
-	int move_speed_pan;		//ÀÆ∆Ω∑∂Œß0-18
-	int move_speed_tilt;	//«„–±∑∂Œß0-14
+	int move_speed_pan;	//ÀÆ∆Ω∑∂Œß0x0-0x18
+	int move_speed_tilt;	//«„–±∑∂Œß0x0-0x14
 
 	BOOL m_thread_run_flag;
 	pthread_t heart_tid;
@@ -64,12 +84,16 @@ typedef struct CameraControl
 	int m_posit_tilt;
 	int m_zoomValue;
 
-	HANDLE m_hHandle1;
-	HANDLE m_hHandle2;
+	pthread_mutex_t mutex1;
+	pthread_mutex_t mutex2;
+	pthread_cond_t  cond1;//init cond
+	pthread_cond_t  cond2;//init cond
 
 } Strategy_CamControl_t;
 
 int init_cam(Strategy_CamControl_t *cam);
+int close_cam(Strategy_CamControl_t *cam);
+
 int startControl(Strategy_CamControl_t *cam,const char addr[], const int port);
 void stopControl(Strategy_CamControl_t *cam);
 BOOL getStart_Status(Strategy_CamControl_t *cam);
@@ -91,6 +115,10 @@ int recv_CameraInfo(Strategy_CamControl_t *cam, char* buffer);
 
 void set_CameraInfo_panTilt(Strategy_CamControl_t *cam,int posit_pan, int posit_tilt);
 void set_CameraInfo_zoom(Strategy_CamControl_t *cam,int zoomValue);
+
+#ifdef  __cplusplus  
+}
+#endif  /* end of __cplusplus */ 
 
 //class PanAndTiltCameraControl
 //{

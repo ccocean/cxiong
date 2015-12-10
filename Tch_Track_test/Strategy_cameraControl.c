@@ -1,4 +1,30 @@
-#include "Strategy_cameraControl.h"
+#include "../track_policy/Strategy_cameraControl.h"
+
+#ifdef WIN32
+#include <windows.h>
+#else
+#include <sys/time.h>
+#endif
+#ifdef WIN32
+int gettimeofday(struct timeval *tp, void *tzp)
+{
+	time_t clock;
+	struct tm tm;
+	SYSTEMTIME wtm;
+	GetLocalTime(&wtm);
+	tm.tm_year = wtm.wYear - 1900;
+	tm.tm_mon = wtm.wMonth - 1;
+	tm.tm_mday = wtm.wDay;
+	tm.tm_hour = wtm.wHour;
+	tm.tm_min = wtm.wMinute;
+	tm.tm_sec = wtm.wSecond;
+	tm.tm_isdst = -1;
+	clock = mktime(&tm);
+	tp->tv_sec = clock;
+	tp->tv_usec = wtm.wMilliseconds * 1000;
+	return (0);
+}
+#endif
 
 BOOL getStart_Status(Strategy_CamControl_t *cam)
 {
@@ -25,7 +51,7 @@ static void* recv_thread(void *argv)
 			len = recv_CameraInfo(p,buffer);
 			if (len >= 7)
 			{
-				if (buffer[1] = 0x50)
+				if (buffer[1] == 0x50)
 				{
 					if (len == 11)
 					{
@@ -34,20 +60,28 @@ static void* recv_thread(void *argv)
 
 						posit_tilt = ((buffer[6] & 0x0f) << 12) + ((buffer[7] & 0x0f) << 8) + ((buffer[8] & 0x0f) << 4) + (buffer[9] & 0x0f);
 						posit_tilt = ((posit_tilt >> 15) & 1) ? posit_tilt | ((-1 >> 16) << 16) : posit_tilt & 0xffff;
+						pthread_mutex_lock(&p->mutex1);
 						set_CameraInfo_panTilt(p,posit_pan, posit_tilt);
-						SetEvent(p->m_hHandle1);
+						pthread_cond_signal(&p->cond1);
+						pthread_mutex_unlock(&p->mutex1);
 					}
 					else if (len == 7)
 					{
 						zoomValue = ((buffer[2] & 0x0f) << 12) + ((buffer[3] & 0x0f) << 8) + ((buffer[4] & 0x0f) << 4) + (buffer[5] & 0x0f);
 						zoomValue = ((zoomValue >> 15) & 1) ? zoomValue | ((-1 >> 16) << 16) : zoomValue & 0xffff;
+						pthread_mutex_lock(&p->mutex2);
 						set_CameraInfo_zoom(p,zoomValue);
-						SetEvent(p->m_hHandle2);
+						pthread_cond_signal(&p->cond2);
+						pthread_mutex_unlock(&p->mutex2);
 					}
 				}
 			}
 		}
+#ifdef WIN32
 		Sleep(10);
+#else
+		usleep(10 * 1000);
+#endif
 	}
 	return NULL;
 }
@@ -66,48 +100,79 @@ static BOOL keepFocus(Strategy_CamControl_t *cam,int type);
 
 int init_cam(Strategy_CamControl_t *cam)
 {
+        cam=(Strategy_CamControl_t*)malloc(sizeof(Strategy_CamControl_t));
 	cam->m_flag_start = FALSE;
 	memset(&cam->m_addr, 0, sizeof(cam->m_addr));
 	memset(&cam->m_buffer, 0, sizeof(cam->m_buffer));
 	cam->m_addr_len = sizeof(struct sockaddr_in);
-	cam->m_send_socket = INVALID_SOCKET;
+	cam->m_send_socket = -1;
 
 	cam->move_speed_pan = CLIENT_CAMERA_SPEED_PAN_MAX;
 	cam->move_speed_tilt = CLIENT_CAMERA_SPEED_TILT_MAX;
 
+	pthread_mutex_init(&(cam->mutex1),NULL);
+	pthread_mutex_init(&(cam->mutex2), NULL);
+	pthread_cond_init(&(cam->cond1),NULL);
+	pthread_cond_init(&(cam->cond2),NULL);
 	cam->m_thread_run_flag = TRUE;
 	int ret = pthread_create(&cam->heart_tid, NULL, recv_thread, (void *)(cam));
-	return 0;
+	return ret;
+}
+
+
+int close_cam(Strategy_CamControl_t *cam)
+{
+	if (cam->m_flag_start == TRUE)
+	{
+		stopControl(cam);
+	}
+	cam->m_thread_run_flag = FALSE;
+	pthread_join(cam->heart_tid, NULL);
+
+	pthread_cond_destroy(&(cam->cond1));
+	pthread_cond_destroy(&(cam->cond2));
+	pthread_mutex_destroy(&(cam->mutex1));
+	pthread_mutex_destroy(&(cam->mutex2));
+        return 0;
 }
 
 int startControl(Strategy_CamControl_t *cam, const char addr[], const int port)
 {
-	if (cam->m_flag_start == FALSE)
+	if (cam->m_thread_run_flag == TRUE)
 	{
-		cam->m_addr.sin_family = AF_INET;
-		cam->m_addr.sin_addr.s_addr = inet_addr(addr);
-		cam->m_addr.sin_port = htons(port);
-		cam->m_send_socket = socket(AF_INET, SOCK_DGRAM, 0);
-		int Time = 1000 * 2;
-		setsockopt(cam->m_send_socket, SOL_SOCKET, SO_RCVTIMEO, (const char *)&Time, sizeof(int));
-		cam->m_hHandle1 = CreateEvent(NULL, FALSE, FALSE, NULL);
-		cam->m_hHandle2 = CreateEvent(NULL, FALSE, FALSE, NULL);
-		if (INVALID_SOCKET == cam->m_send_socket)
+		if (cam->m_flag_start == FALSE)
 		{
-			printf("error!\n");
-			return FALSE;
+			cam->m_addr.sin_family = AF_INET;
+			cam->m_addr.sin_addr.s_addr = inet_addr(addr);
+			cam->m_addr.sin_port = htons(port);
+			cam->m_send_socket = socket(AF_INET, SOCK_DGRAM, 0);
+			struct timeval Time;
+			Time.tv_sec = 1;
+			Time.tv_usec = 0;
+			setsockopt(cam->m_send_socket, SOL_SOCKET, SO_RCVTIMEO, (const char *)&Time, sizeof(int));
+			if (3 > cam->m_send_socket)
+			{
+				printf("error!\n");
+				return FALSE;
+			}
+			cam->m_flag_start = TRUE;
 		}
-		cam->m_flag_start = TRUE;
+		setMoveSpeed(cam, CLIENT_CAMERA_SPEED_PAN_MAX, CLIENT_CAMERA_SPEED_TILT_MAX);//max speed
+		return TRUE;
 	}
-	setMoveSpeed(cam, 18, 14);//max speed
-	return TRUE;
+	else
+	{
+		return FALSE;
+	}
 }
 
 void stopControl(Strategy_CamControl_t *cam)
 {
-	CloseHandle(cam->m_hHandle1);
-	CloseHandle(cam->m_hHandle2);
+#ifdef WIN32
 	closesocket(cam->m_send_socket);
+#else
+	close(cam->m_send_socket);
+#endif
 	cam->m_flag_start = FALSE;
 }
 
@@ -336,36 +401,48 @@ BOOL keepZoom(Strategy_CamControl_t *cam, int type)
 BOOL getPosit(Strategy_CamControl_t *cam, int *posit_pan, int *posit_tilt, int waitMillisecond)
 {
 	char instruct[] = { 0x81, 0x09, 0x06, 0x12, 0xFF };
-	ResetEvent(cam->m_hHandle1);
-	if (send_net_cmd(cam,instruct, sizeof(instruct)) != sizeof(instruct))
-		return FALSE;
-	if (WaitForSingleObject(cam->m_hHandle1, waitMillisecond) == WAIT_OBJECT_0)
+	struct timeval tt;
+	gettimeofday(&tt, NULL);
+	struct timespec waitTime;
+	waitTime.tv_sec = tt.tv_sec + waitMillisecond / 1000;
+	waitTime.tv_nsec = tt.tv_usec * 1000 + (waitMillisecond % 1000) * 1000 * 1000;
+
+	BOOL ret = FALSE;
+	pthread_mutex_lock(&cam->mutex1);
+	if (send_net_cmd(cam,instruct, sizeof(instruct)) == sizeof(instruct))
 	{
-		*posit_pan = cam->m_posit_pan;
-		*posit_tilt = cam->m_posit_tilt;
-		return TRUE;
+		if (pthread_cond_timedwait(&cam->cond1, &cam->mutex1, &waitTime) != ETIMEDOUT)
+		{
+			*posit_pan = cam->m_posit_pan;
+			*posit_tilt = cam->m_posit_tilt;
+			ret = TRUE;
+		}
 	}
-	else
-	{
-		return FALSE;
-	}
+	pthread_mutex_unlock(&cam->mutex1);
+	return ret;
 }
 
 BOOL getZoom(Strategy_CamControl_t *cam, int *zoomValue, int waitMillisecond)
 {
 	char instruct[] = { 0x81, 0x09, 0x04, 0x47, 0xFF };
-	ResetEvent(cam->m_hHandle2);
-	if (send_net_cmd(cam, instruct, sizeof(instruct)) != sizeof(instruct))
-		return FALSE;
-	if (WaitForSingleObject(cam->m_hHandle2, waitMillisecond) == WAIT_OBJECT_0)
+	struct timeval tt;
+	gettimeofday(&tt,NULL);
+	struct timespec waitTime;
+	waitTime.tv_sec = tt.tv_sec + waitMillisecond / 1000;
+	waitTime.tv_nsec = tt.tv_usec * 1000 + (waitMillisecond % 1000) * 1000 * 1000;
+
+	BOOL ret = FALSE;
+	pthread_mutex_lock(&cam->mutex2);
+	if (send_net_cmd(cam, instruct, sizeof(instruct)) == sizeof(instruct))
 	{
-		*zoomValue = cam->m_zoomValue;
-		return TRUE;
+		if (pthread_cond_timedwait(&cam->cond2, &cam->mutex2, &waitTime) != ETIMEDOUT)
+		{
+			*zoomValue = cam->m_zoomValue;
+			ret = TRUE;
+		}
 	}
-	else
-	{
-		return FALSE;
-	}
+	pthread_mutex_unlock(&cam->mutex2);
+	return ret;
 }
 
 //BOOL reBoot(Strategy_CamControl_t *cam)
@@ -375,7 +452,8 @@ BOOL getZoom(Strategy_CamControl_t *cam, int *zoomValue, int waitMillisecond)
 
 int recv_CameraInfo(Strategy_CamControl_t *cam, char* buffer)
 {
-	int len = recvfrom(cam->m_send_socket, cam->m_buffer, sizeof(cam->m_buffer), 0, (struct sockaddr*)&cam->m_addr, &cam->m_addr_len);
+	int len = recvfrom(cam->m_send_socket, cam->m_buffer, sizeof(cam->m_buffer), 0,
+			(struct sockaddr*)&cam->m_addr, (socklen_t *)&cam->m_addr_len);
 	if (len > 0)
 	{
 		memcpy(buffer, cam->m_buffer, len);
