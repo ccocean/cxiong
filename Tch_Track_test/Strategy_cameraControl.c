@@ -1,10 +1,11 @@
-#include "../track_policy/Strategy_cameraControl.h"
-
 #ifdef WIN32
+#include "Strategy_cameraControl.h"
 #include <windows.h>
 #else
+#include "../track_policy/Strategy_cameraControl.h"
 #include <sys/time.h>
 #endif
+
 #ifdef WIN32
 int gettimeofday(struct timeval *tp, void *tzp)
 {
@@ -20,11 +21,11 @@ int gettimeofday(struct timeval *tp, void *tzp)
 	tm.tm_sec = wtm.wSecond;
 	tm.tm_isdst = -1;
 	clock = mktime(&tm);
-	tp->tv_sec = clock;
+	tp->tv_sec = (long)clock;
 	tp->tv_usec = wtm.wMilliseconds * 1000;
-	return (0);
+	return 0;
 }
-#endif
+#endif // WIN32
 
 BOOL getStart_Status(Strategy_CamControl_t *cam)
 {
@@ -100,7 +101,7 @@ static BOOL keepFocus(Strategy_CamControl_t *cam,int type);
 
 int init_cam(Strategy_CamControl_t *cam)
 {
-        cam=(Strategy_CamControl_t*)malloc(sizeof(Strategy_CamControl_t));
+    cam=(Strategy_CamControl_t*)malloc(sizeof(Strategy_CamControl_t));
 	cam->m_flag_start = FALSE;
 	memset(&cam->m_addr, 0, sizeof(cam->m_addr));
 	memset(&cam->m_buffer, 0, sizeof(cam->m_buffer));
@@ -133,7 +134,7 @@ int close_cam(Strategy_CamControl_t *cam)
 	pthread_cond_destroy(&(cam->cond2));
 	pthread_mutex_destroy(&(cam->mutex1));
 	pthread_mutex_destroy(&(cam->mutex2));
-        return 0;
+    return 0;
 }
 
 int startControl(Strategy_CamControl_t *cam, const char addr[], const int port)
@@ -146,6 +147,7 @@ int startControl(Strategy_CamControl_t *cam, const char addr[], const int port)
 			cam->m_addr.sin_addr.s_addr = inet_addr(addr);
 			cam->m_addr.sin_port = htons(port);
 			cam->m_send_socket = socket(AF_INET, SOCK_DGRAM, 0);
+			connect(cam->m_send_socket, &(cam->m_addr), sizeof(cam->m_addr));
 			struct timeval Time;
 			Time.tv_sec = 1;
 			Time.tv_usec = 0;
@@ -178,7 +180,8 @@ void stopControl(Strategy_CamControl_t *cam)
 
 int send_net_cmd(Strategy_CamControl_t *cam, char *cmd, int len)
 {
-	return sendto(cam->m_send_socket, cmd, len, 0, (struct sockaddr *)&cam->m_addr, cam->m_addr_len);
+	//return sendto(cam->m_send_socket, cmd, len, 0, (struct sockaddr *)&cam->m_addr, cam->m_addr_len);
+	return send(cam->m_send_socket, cmd, len, 0);
 }
 
 void setMoveSpeed(Strategy_CamControl_t *cam, int speed_pan, int speed_tilt)
@@ -452,8 +455,9 @@ BOOL getZoom(Strategy_CamControl_t *cam, int *zoomValue, int waitMillisecond)
 
 int recv_CameraInfo(Strategy_CamControl_t *cam, char* buffer)
 {
-	int len = recvfrom(cam->m_send_socket, cam->m_buffer, sizeof(cam->m_buffer), 0,
-			(struct sockaddr*)&cam->m_addr, (socklen_t *)&cam->m_addr_len);
+	//int len = recvfrom(cam->m_send_socket, cam->m_buffer, sizeof(cam->m_buffer), 0,
+	//		(struct sockaddr*)&cam->m_addr, (socklen_t *)&cam->m_addr_len);
+	int len = recv(cam->m_send_socket, cam->m_buffer, sizeof(cam->m_buffer),0);
 	if (len > 0)
 	{
 		memcpy(buffer, cam->m_buffer, len);

@@ -86,34 +86,9 @@ typedef struct StrategyTimer
 
 typedef struct Strategy_Result
 {
-       // int result_activity;
-	//int display_time;
-        //int firstpicture;
-        
-	//int VGA_flag;//VGA信号标志
-	//int STU_flag;//学生信号标志
-	//int TCH_flag;//教师信号标志
-
-	//Strategy_Queue *tch_que;//教师序列分析
-	//int tch_posIndex;//教师位置
-	//int tch_status;
-        //教师状态
-
-	//TrackPrarms_Point_t stu_pos;//学生坐标
-	int status;//画面状态的指令
-	int last_status;
-        //上一次的画面状态
-	//int posit_pan; //相机水平坐标
-	//int posit_tilt; //相机垂直坐标
-	//Strategy_Timer_t timer_stra;//计时器
-
-}Strategy_Result_t;
-
-typedef struct Strategy_sysData
-{
-        int result_activity;//录制初始画面标识符
-	int display_time;//初始画面持续时间
-        int firstpicture;//初始画面状态
+        int result_activity;
+	int display_time;
+        int firstpicture;
         
 	int VGA_flag;//VGA信号标志
 	int STU_flag;//学生信号标志
@@ -124,82 +99,45 @@ typedef struct Strategy_sysData
 	int tch_status;//教师状态
 
 	TrackPrarms_Point_t stu_pos;//学生坐标
-        
-        int posit_pan; //相机水平坐标
+
+	int status;//画面状态的指令
+	int last_status;//上一次的画面状态
+
+	int posit_pan; //相机水平坐标
 	int posit_tilt; //相机垂直坐标
 
 	Strategy_Timer_t timer_stra;//计时器
-        
-        Strategy_CamControl_t *tch_cam;//教师相机
-	Strategy_CamControl_t *stu_cam;//学生相机
-}Strategy_sysData_t;
+
+}Strategy_Result_t;
 
 typedef struct Track_Strategy
 {
-        //int isInit;//是否初始化的标识符
-	char *tch_ip;//教师相机的ip
-	char *stu_ip;//学生相机的ip
-	int tch_port;//教师相机的端口
-	int stu_port;//学生相机的端口
+        int isInit;
+	char *tch_ip;
+	char *stu_ip;
+	int tch_port;
+	int stu_port;
 	AlgLink_ScdResult *vga;//vga结构体
 	Tch_Result_t *tch;//教师结果结构体
 	StuITRACK_OutParams_t *stu;//学生结果结构体
-        void *sysData;
-        //学生结果结构体
-	//Strategy_CamControl_t *tch_cam;//教师相机
-	//Strategy_CamControl_t *stu_cam;//学生相机
+	Strategy_Result_t *stra;//决策结果结构体
+	Strategy_CamControl_t *tch_cam;//教师相机
+	Strategy_CamControl_t *stu_cam;//学生相机
 }Track_Strategy_t;
 
-/*==============================================================================
-    函数: <switch_strategy>
-    功能: 获取决策结果
-    参数:track_stra :已经初始化的决策器
- *          char *tch_ip;//教师相机的ip
-            char *stu_ip;//学生相机的ip
-            int tch_port;//教师相机的端口
-            int stu_port;//学生相机的端口
-            AlgLink_ScdResult *vga;//vga结构体
-            Tch_Result_t *tch;//教师结果结构体
-            StuITRACK_OutParams_t *stu;//学生结果结构体
-         stra_res   :决策的结果
- *          int status;//画面状态的指令
- *          int last_status;//上一次画面状态的指令
-    返回值:非0-决策代码   否则无决策
-==============================================================================*/
-int switch_strategy(Track_Strategy_t *track_stra, Strategy_Result_t *stra_res);
+/*
+tch: 为教师跟踪返回的结果；
+stu: 为学生跟踪返回的结果；
+stra: 为已经初始化了的决策器；
+cam_tch: 为控制教师特写镜头的控制器；
+cam_stu: 为控制学生特写镜头的控制器。
+*/
+//int switch_strategy(Tch_Result_t* tch, StuITRACK_OutParams_t* stu, Strategy_Result_t* stra, Strategy_CamControl_t *cam_tch);
 
-/*==============================================================================
-    函数: <init_track_strategy>
-    功能: 初始化决策器
-    参数:track_stra :
-        char *tch_ip;//教师相机的ip
-	char *stu_ip;//学生相机的ip
-	int tch_port;//教师相机的端口
-	int stu_port;//学生相机的端口
-	AlgLink_ScdResult *vga;//vga结构体
-	Tch_Result_t *tch;//教师结果结构体
-	StuITRACK_OutParams_t *stu;//学生结果结构体
-    返回值:0-成功   否则失败
-==============================================================================*/
-int init_track_strategy(Track_Strategy_t *track_stra);
+//初始化决策器
+//int init_strategy(Strategy_Result_t* stra);
 
-/*==============================================================================
-    函数: <destroy_track_strategy>
-    功能: 摧毁决策器
-    参数:track_stra :
-    返回值:0-成功   否则失败
-==============================================================================*/
-int destroy_track_strategy(Track_Strategy_t *track_stra);
-
-/*==============================================================================
-    函数: <first_PicMode>
-    功能: 设置录制初始画面
-    参数:fpm :
-        int option;//设置或者获取
-	int firstpicture;
-	int display_time;
-    返回值:0-成功   否则失败
-==============================================================================*/
+int track_strategy(Track_Strategy_t *track_stra);
 int first_PicMode(MainEnc_FirstPicMode_t *fpm, Track_Strategy_t *track_stra);
 #ifdef __cplusplus
 }

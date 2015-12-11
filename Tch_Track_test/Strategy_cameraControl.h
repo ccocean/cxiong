@@ -1,5 +1,3 @@
-//#include "stdafx.h"
-
 #ifndef STTATEGY_CAMERACONTROL_H
 #define STTATEGY_CAMERACONTROL_H
 
@@ -119,56 +117,5 @@ void set_CameraInfo_zoom(Strategy_CamControl_t *cam,int zoomValue);
 #ifdef  __cplusplus  
 }
 #endif  /* end of __cplusplus */ 
-
-//class PanAndTiltCameraControl
-//{
-//public:
-//	PanAndTiltCameraControl();
-//	~PanAndTiltCameraControl();
-//	int startControl(const char addr[], const int port);
-//	void stopControl();
-//	BOOL getStart_Status();
-//
-//	void setMoveSpeed(int speed_pan, int speed_tilt);
-//	BOOL move(int posittion_pan, int posittion_tilt, int flag = TRUE);
-//	BOOL setZoom(int zoomPosition);
-//
-//	BOOL home();
-//	BOOL keepInstruct(int type, void* otherData = NULL);
-//	BOOL preset(int type, int id);
-//
-//	BOOL getPosit(int *posit_pan, int *posit_tilt, int waitMillisecond);
-//	BOOL getZoom(int *zoomValue, int waitMillisecond);
-//
-//	BOOL getRun_Status();
-//	int recv_CameraInfo(char* buffer);
-//	HANDLE m_hHandle1;
-//	HANDLE m_hHandle2;
-//	void set_CameraInfo_panTilt(int posit_pan, int posit_tilt);
-//	void set_CameraInfo_zoom(int zoomValue);
-//protected:
-//
-//private:
-//	BOOL m_flag_start;
-//
-//	struct sockaddr_in m_addr;
-//	char m_buffer[ACCEPT_BUFFER_SIZE];
-//	int m_addr_len;
-//	int m_send_socket;
-//
-//	int move_speed_pan;		//Ë®Æ½·¶Î§0-18
-//	int move_speed_tilt;	//ÇãÐ±·¶Î§0-14
-//	int send_net_cmd(char *cmd, int len);
-//
-//	BOOL keepMove(int type);
-//	BOOL keepZoom(int type);
-//	BOOL keepFocus(int type);
-//
-//	BOOL m_thread_run_flag;
-//	pthread_t heart_tid;
-//	int m_posit_pan;
-//	int m_posit_tilt;
-//	int m_zoomValue;
-//};
 
 #endif
