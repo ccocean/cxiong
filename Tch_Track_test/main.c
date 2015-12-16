@@ -2,7 +2,7 @@
 #include "Queue.h"
 #include<opencv/cv.h>
 #include<opencv/highgui.h>
-#include "switch_strategy.h"
+//#include "switch_strategy.h"
 #include "Strategy_cameraControl.h"
 //#include "client_cameraControl.h"
 
@@ -51,14 +51,14 @@ int main()
 	Tch_Rect_t blk = { 0, 26, WIDTH, 37 }; //{0, 35, 640, 50}
 	Tch_Threshold_t threshold = { 2, 7200, 95 };//{2, 12000, 130}
 	TeaITRACK_Params *argument;
-	StuITRACK_OutParams_t *stu;
-	Strategy_Result_t *stra;
-	stra = (Strategy_Result_t *)malloc(sizeof(Strategy_Result_t));
-	init_strategy(stra);
-	stu = (StuITRACK_OutParams_t *)malloc(sizeof(StuITRACK_OutParams_t));
+	//StuITRACK_OutParams_t *stu;
+	//Strategy_Result_t *stra;
+	//stra = (Strategy_Result_t *)malloc(sizeof(Strategy_Result_t));
+	//init_strategy(stra);
+	/*stu = (StuITRACK_OutParams_t *)malloc(sizeof(StuITRACK_OutParams_t));
 	stu->count_trackObj_bigMove = -1;
 	stu->count_trackObj_stand = -1;
-	stu->result_flag = 0;
+	stu->result_flag = 0;*/
 	argument = (TeaITRACK_Params *)malloc(sizeof(TeaITRACK_Params));
 	argument->frame = _frame;
 	argument->tch = tch;
@@ -118,17 +118,20 @@ int main()
 		cvShowImage("teacher", &testMat);
 		start = clock();
 		result = tch_track(yuvImg->imageData,uv,argument,data,res);
-		int strategy = switch_strategy(res, stu, stra,cam_tch);
+		//int strategy = switch_strategy(res, stu, stra,cam_tch);
 		end = clock();
 		//if (/*last_status != res->status || last_pos != res->pos*/strategy == 1)
 		//{
 			delta = (end - start);
-			if (strategy == 1)
+			/*if (strategy == 1)
 			{
 				printf("status:%d, position:%d, time:%f\r\n", stra->tch_status, stra->tch_posIndex, (double)(delta / CLOCKS_PER_SEC));
+			}*/
+			if (result==1)
+			{
+				printf("status:%d, position:%d, time:%f\r\n", res->status, res->pos, (double)(delta / CLOCKS_PER_SEC));
 			}
 			
-			//printf("status:%d, position:%d, time:%f\r\n", res->status, res->pos, (double)(delta / CLOCKS_PER_SEC));
 			/*last_status = res->status;
 			last_status = res->status;
 			last_pos = res->pos;*/

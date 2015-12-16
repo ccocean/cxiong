@@ -99,12 +99,12 @@ static BOOL keepFocus(Strategy_CamControl_t *cam,int type);
 #define CLIENT_CAMERA_SPEED_TILT_MIN 0
 #define CLIENT_CAMERA_SPEED_TILT_MAX 20
 
-int init_cam(Strategy_CamControl_t *cam)
+int init_cam(Strategy_CamControl_t * cam)
 {
-    cam=(Strategy_CamControl_t*)malloc(sizeof(Strategy_CamControl_t));
+	//cam = (Strategy_CamControl_t*)malloc(sizeof(Strategy_CamControl_t));
 	cam->m_flag_start = FALSE;
 	memset(&cam->m_addr, 0, sizeof(cam->m_addr));
-	memset(&cam->m_buffer, 0, sizeof(cam->m_buffer));
+	memset(cam->m_buffer, 0, sizeof(cam->m_buffer));
 	cam->m_addr_len = sizeof(struct sockaddr_in);
 	cam->m_send_socket = -1;
 
@@ -117,55 +117,81 @@ int init_cam(Strategy_CamControl_t *cam)
 	pthread_cond_init(&(cam->cond2),NULL);
 	cam->m_thread_run_flag = TRUE;
 	int ret = pthread_create(&cam->heart_tid, NULL, recv_thread, (void *)(cam));
-	return ret;
+       /* if(ret!=0)
+        {
+            printf("cams thread create failed! errno=%d,<%s>!\n",errno,strerror(errno));
+        }*/
+        return ret;
 }
 
 
 int close_cam(Strategy_CamControl_t *cam)
 {
-	if (cam->m_flag_start == TRUE)
+	if (NULL==cam)
 	{
-		stopControl(cam);
+		return -1;
 	}
-	cam->m_thread_run_flag = FALSE;
-	pthread_join(cam->heart_tid, NULL);
+	Strategy_CamControl_t* temp = cam;
+	if (NULL==temp)
+	{
+		return -1;
+	}
+	if (temp->m_flag_start == TRUE)
+	{
+		stopControl(temp);
+	}
+	temp->m_thread_run_flag = FALSE;
+	pthread_join(temp->heart_tid, NULL);
 
-	pthread_cond_destroy(&(cam->cond1));
-	pthread_cond_destroy(&(cam->cond2));
-	pthread_mutex_destroy(&(cam->mutex1));
-	pthread_mutex_destroy(&(cam->mutex2));
+	pthread_cond_destroy(&(temp->cond1));
+	pthread_cond_destroy(&(temp->cond2));
+	pthread_mutex_destroy(&(temp->mutex1));
+	pthread_mutex_destroy(&(temp->mutex2));
+	free(temp);
+	cam = NULL;
     return 0;
 }
 
 int startControl(Strategy_CamControl_t *cam, const char addr[], const int port)
 {
-	if (cam->m_thread_run_flag == TRUE)
-	{
-		if (cam->m_flag_start == FALSE)
-		{
-			cam->m_addr.sin_family = AF_INET;
-			cam->m_addr.sin_addr.s_addr = inet_addr(addr);
-			cam->m_addr.sin_port = htons(port);
-			cam->m_send_socket = socket(AF_INET, SOCK_DGRAM, 0);
-			connect(cam->m_send_socket, &(cam->m_addr), sizeof(cam->m_addr));
-			struct timeval Time;
-			Time.tv_sec = 1;
-			Time.tv_usec = 0;
-			setsockopt(cam->m_send_socket, SOL_SOCKET, SO_RCVTIMEO, (const char *)&Time, sizeof(int));
-			if (3 > cam->m_send_socket)
-			{
-				printf("error!\n");
-				return FALSE;
-			}
-			cam->m_flag_start = TRUE;
-		}
-		setMoveSpeed(cam, CLIENT_CAMERA_SPEED_PAN_MAX, CLIENT_CAMERA_SPEED_TILT_MAX);//max speed
-		return TRUE;
-	}
-	else
-	{
-		return FALSE;
-	}
+    if(NULL==cam)
+        return FALSE;
+    if (cam->m_thread_run_flag == TRUE)
+    {
+        if (cam->m_flag_start == FALSE)
+        {
+            cam->m_addr.sin_family = AF_INET;
+            cam->m_addr.sin_addr.s_addr = inet_addr(addr);
+            cam->m_addr.sin_port = htons(port);
+            cam->m_send_socket = socket(AF_INET, SOCK_DGRAM, 0);
+            connect(cam->m_send_socket, &(cam->m_addr), sizeof(cam->m_addr));
+/*
+            if (0 != cam->m_send_socket)
+            {
+                printf("error!=0\n");
+                printf("errno=%d,<%s>!\n",errno,strerror(errno));
+                return FALSE;
+            }
+*/
+            struct timeval Time;
+            Time.tv_sec = 1;
+            Time.tv_usec = 0;
+            setsockopt(cam->m_send_socket, SOL_SOCKET, SO_RCVTIMEO, (const char *)&Time, sizeof(int));
+            if (3 > cam->m_send_socket)
+            {
+                printf("error>3\n");
+                printf("errno=%d,<%s>!\n",errno,strerror(errno));
+                return FALSE;
+            }
+            cam->m_flag_start = TRUE;
+        }
+        //setMoveSpeed(cam, CLIENT_CAMERA_SPEED_PAN_MAX, CLIENT_CAMERA_SPEED_TILT_MAX);//max speed
+        return TRUE;
+    }
+    else
+    {
+        return FALSE;
+    }
 }
 
 void stopControl(Strategy_CamControl_t *cam)
@@ -180,23 +206,34 @@ void stopControl(Strategy_CamControl_t *cam)
 
 int send_net_cmd(Strategy_CamControl_t *cam, char *cmd, int len)
 {
+    if(NULL==cam||NULL==cmd)
+    {
+        printf("NULL pointer!");
+        return FALSE;
+    }
 	//return sendto(cam->m_send_socket, cmd, len, 0, (struct sockaddr *)&cam->m_addr, cam->m_addr_len);
-	return send(cam->m_send_socket, cmd, len, 0);
+    return send(cam->m_send_socket, cmd, len, 0);
 }
 
 void setMoveSpeed(Strategy_CamControl_t *cam, int speed_pan, int speed_tilt)
 {
-	if (speed_pan < CLIENT_CAMERA_SPEED_PAN_MIN)
-		speed_pan = CLIENT_CAMERA_SPEED_PAN_MIN;
-	if (speed_pan > CLIENT_CAMERA_SPEED_PAN_MAX)
-		speed_pan = CLIENT_CAMERA_SPEED_PAN_MAX;
-	if (speed_tilt < CLIENT_CAMERA_SPEED_TILT_MIN)
-		speed_tilt = CLIENT_CAMERA_SPEED_TILT_MIN;
-	if (speed_tilt > CLIENT_CAMERA_SPEED_TILT_MAX)
-		speed_tilt = CLIENT_CAMERA_SPEED_TILT_MAX;
+    if(NULL==cam)
+    {
+        printf("NULL pointer!");
+        return;
+    }
+        
+    if (speed_pan < CLIENT_CAMERA_SPEED_PAN_MIN)
+            speed_pan = CLIENT_CAMERA_SPEED_PAN_MIN;
+    if (speed_pan > CLIENT_CAMERA_SPEED_PAN_MAX)
+            speed_pan = CLIENT_CAMERA_SPEED_PAN_MAX;
+    if (speed_tilt < CLIENT_CAMERA_SPEED_TILT_MIN)
+            speed_tilt = CLIENT_CAMERA_SPEED_TILT_MIN;
+    if (speed_tilt > CLIENT_CAMERA_SPEED_TILT_MAX)
+            speed_tilt = CLIENT_CAMERA_SPEED_TILT_MAX;
 
-	cam->move_speed_pan = speed_pan;
-	cam->move_speed_tilt = speed_tilt;
+    cam->move_speed_pan = speed_pan;
+    cam->move_speed_tilt = speed_tilt;
 }
 
 
@@ -208,29 +245,34 @@ void setMoveSpeed(Strategy_CamControl_t *cam, int speed_pan, int speed_tilt)
 #define POSITTION_TO_4BYTE(x) ((x >> 12) & 0x000f), ((x >> 8) & 0x000f), ((x >> 4) & 0x000f), (x & 0x000f)
 BOOL move(Strategy_CamControl_t *cam, int posittion_pan, int posittion_tilt, int flag)
 {
-	if (posittion_pan < CLIENT_CAMERA_POSITTOIN_PAN_MIN)
-		posittion_pan = CLIENT_CAMERA_POSITTOIN_PAN_MIN;
-	if (posittion_pan > CLIENT_CAMERA_POSITTOIN_PAN_MAX)
-		posittion_pan = CLIENT_CAMERA_POSITTOIN_PAN_MAX;
+    if(NULL==cam)
+    {
+        printf("NULL pointer!");
+        return FALSE;
+    }
+    if (posittion_pan < CLIENT_CAMERA_POSITTOIN_PAN_MIN)
+            posittion_pan = CLIENT_CAMERA_POSITTOIN_PAN_MIN;
+    if (posittion_pan > CLIENT_CAMERA_POSITTOIN_PAN_MAX)
+            posittion_pan = CLIENT_CAMERA_POSITTOIN_PAN_MAX;
 
-	if (posittion_tilt < CLIENT_CAMERA_POSITTOIN_TILT_MIN)
-		posittion_tilt = CLIENT_CAMERA_POSITTOIN_TILT_MIN;
-	if (posittion_tilt > CLIENT_CAMERA_POSITTOIN_TILT_MAX)
-		posittion_tilt = CLIENT_CAMERA_POSITTOIN_TILT_MAX;
+    if (posittion_tilt < CLIENT_CAMERA_POSITTOIN_TILT_MIN)
+            posittion_tilt = CLIENT_CAMERA_POSITTOIN_TILT_MIN;
+    if (posittion_tilt > CLIENT_CAMERA_POSITTOIN_TILT_MAX)
+            posittion_tilt = CLIENT_CAMERA_POSITTOIN_TILT_MAX;
 
-	char instruct[] = { 0x81, 0x01, 0x06, 0x02, cam->move_speed_pan, cam->move_speed_tilt, POSITTION_TO_4BYTE(posittion_pan), POSITTION_TO_4BYTE(posittion_tilt), 0xFF };
-	if (flag == TRUE)
-	{
-		instruct[3] = 0x03;//相对坐标
-	}
-	else
-	{
-		instruct[3] = 0x02;//绝对坐标
-	}
-	if (send_net_cmd(cam, instruct, sizeof(instruct)) != sizeof(instruct))
-		return FALSE;
-	else
-		return TRUE;
+    char instruct[] = { 0x81, 0x01, 0x06, 0x02, cam->move_speed_pan, cam->move_speed_tilt, POSITTION_TO_4BYTE(posittion_pan), POSITTION_TO_4BYTE(posittion_tilt), 0xFF };
+    if (flag == TRUE)
+    {
+        instruct[3] = 0x03;//相对坐标
+    }
+    else
+    {
+        instruct[3] = 0x02;//绝对坐标
+    }
+    if (send_net_cmd(cam, instruct, sizeof(instruct)) != sizeof(instruct))
+        return FALSE;
+    else
+        return TRUE;
 }
 
 #define CLIENT_CAMERA_ZOOM_MIN 0x0000
@@ -238,214 +280,259 @@ BOOL move(Strategy_CamControl_t *cam, int posittion_pan, int posittion_tilt, int
 #define ZOOMPOSITION_TO_4BYTE(x) ((x >> 12) & 0x000f), ((x >> 8) & 0x000f), ((x >> 4) & 0x000f), (x & 0x000f)
 BOOL setZoom(Strategy_CamControl_t *cam, int zoomPosition)
 {
-	if (zoomPosition < CLIENT_CAMERA_ZOOM_MIN)
-		zoomPosition = CLIENT_CAMERA_ZOOM_MIN;
-	if (zoomPosition > CLIENT_CAMERA_ZOOM_MAX)
-		zoomPosition = CLIENT_CAMERA_ZOOM_MAX;
+    if(NULL==cam)
+    {
+        printf("NULL pointer!");
+        return FALSE;
+    }
+    if (zoomPosition < CLIENT_CAMERA_ZOOM_MIN)
+            zoomPosition = CLIENT_CAMERA_ZOOM_MIN;
+    if (zoomPosition > CLIENT_CAMERA_ZOOM_MAX)
+            zoomPosition = CLIENT_CAMERA_ZOOM_MAX;
 
-	char instruct[] = { 0x81, 0x01, 0x04, 0x47, ZOOMPOSITION_TO_4BYTE(zoomPosition), 0xFF };
-	if (send_net_cmd(cam, instruct, sizeof(instruct)) != sizeof(instruct))
-		return FALSE;
-	else
-		return TRUE;
+    char instruct[] = { 0x81, 0x01, 0x04, 0x47, ZOOMPOSITION_TO_4BYTE(zoomPosition), 0xFF };
+    if (send_net_cmd(cam, instruct, sizeof(instruct)) != sizeof(instruct))
+            return FALSE;
+    else
+            return TRUE;
 }
 
 BOOL home(Strategy_CamControl_t *cam)
 //返回源点
 {
-	char instruct[] = { 0x81, 0x01, 0x06, 0x04, 0xFF };
-	if (send_net_cmd(cam, instruct, sizeof(instruct)) != sizeof(instruct))
-	{
-		return FALSE;
-	}
-	else
-	{
-		return TRUE;
-	}
+    if(NULL==cam)
+    {
+        printf("NULL pointer!");
+        return FALSE;
+    }
+    char instruct[] = { 0x81, 0x01, 0x06, 0x04, 0xFF };
+    if (send_net_cmd(cam, instruct, sizeof(instruct)) != sizeof(instruct))
+    {
+        return FALSE;
+    }
+    else
+    {
+        return TRUE;
+    }
 }
 
 BOOL keepInstruct(Strategy_CamControl_t *cam,int type)
 {
-	BOOL flag = FALSE;
-	switch (type & PANandTILT_CTRL_PTZ_MASK){
-	case 0x1000:
-		flag = keepMove(cam,type);
-		break;
-	case 0x2000:
-		flag = keepZoom(cam,type);
-		break;
-	case 0x3000:
-		//对焦操作
-		flag = keepFocus(cam,type);
-		break;
-	default:
-		break;
-	}
-	return flag;
+    if(NULL==cam)
+    {
+        printf("NULL pointer!");
+        return FALSE;
+    }
+    BOOL flag = FALSE;
+    switch (type & PANandTILT_CTRL_PTZ_MASK){
+    case 0x1000:
+            flag = keepMove(cam,type);
+            break;
+    case 0x2000:
+            flag = keepZoom(cam,type);
+            break;
+    case 0x3000:
+            //对焦操作
+            flag = keepFocus(cam,type);
+            break;
+    default:
+            break;
+    }
+    return flag;
 }
 
 BOOL preset(Strategy_CamControl_t *cam,int type, int id)
 {
-	//预置位
-	if (id<0 || id>254)
-		return FALSE;
+    if(NULL==cam)
+    {
+        printf("NULL pointer!");
+        return FALSE;
+    }
+    //预置位
+    if (id<0 || id>254)
+            return FALSE;
 
-	char instruct[] = { 0x81, 0x01, 0x04, 0x3F, 0x00, id, 0xFF };
-	switch (type){
-	case PANandTILT_CTRL_PTZ_GOTO_PRESET://运行到预置位
-		instruct[4] = 0x02;
-		break;
-	case PANandTILT_CTRL_PTZ_SET_PRESET://设置当前位置为预置位
-		instruct[4] = 0x01;
-		break;
-	case PANandTILT_CTRL_PTZ_CLE_PRESET://删除当前预置位
-		instruct[4] = 0x00;
-		break;
-	default:
-		instruct[4] = 0x02;
-		break;
-	}
-	if (send_net_cmd(cam,instruct, sizeof(instruct)) != sizeof(instruct))
-		return FALSE;
-	else
-		return TRUE;
+    char instruct[] = { 0x81, 0x01, 0x04, 0x3F, 0x00, id, 0xFF };
+    switch (type){
+    case PANandTILT_CTRL_PTZ_GOTO_PRESET://运行到预置位
+            instruct[4] = 0x02;
+            break;
+    case PANandTILT_CTRL_PTZ_SET_PRESET://设置当前位置为预置位
+            instruct[4] = 0x01;
+            break;
+    case PANandTILT_CTRL_PTZ_CLE_PRESET://删除当前预置位
+            instruct[4] = 0x00;
+            break;
+    default:
+            instruct[4] = 0x02;
+            break;
+    }
+    if (send_net_cmd(cam,instruct, sizeof(instruct)) != sizeof(instruct))
+            return FALSE;
+    else
+            return TRUE;
 }
 
 BOOL keepFocus(Strategy_CamControl_t *cam,int type)
 {
-	char instruct[] = { 0x81, 0x01, 0x04, 0x08, 0x00, 0xFF };
-	switch (type)
-	{
-	case PANandTILT_CTRL_PTZ_FOCUSMANUAL:
-		instruct[3] = 0x38;
-		instruct[4] = 0x03;
-		break;
-	case PANandTILT_CTRL_PTZ_FOCUSAUTO:
-		instruct[3] = 0x38;
-		instruct[4] = 0x02;
-		break;
-	case PANandTILT_CTRL_PTZ_FOCUSIN:
-		instruct[4] = 0x02;
-		break;
-	case PANandTILT_CTRL_PTZ_FOCUSOUT:
-		instruct[4] = 0x03;
-		break;
-	case PANandTILT_CTRL_PTZ_FOCUSSTOP:
-		break;
-	default:
-		instruct[3] = 0x38;
-		instruct[4] = 0x02;
-		break;
-	}
-	if (send_net_cmd(cam, instruct, sizeof(instruct)) != sizeof(instruct))
-		return FALSE;
-	else
-		return TRUE;
+    if(NULL==cam)
+    {
+        printf("NULL pointer!");
+        return FALSE;
+    }
+    char instruct[] = { 0x81, 0x01, 0x04, 0x08, 0x00, 0xFF };
+    switch (type)
+    {
+    case PANandTILT_CTRL_PTZ_FOCUSMANUAL:
+            instruct[3] = 0x38;
+            instruct[4] = 0x03;
+            break;
+    case PANandTILT_CTRL_PTZ_FOCUSAUTO:
+            instruct[3] = 0x38;
+            instruct[4] = 0x02;
+            break;
+    case PANandTILT_CTRL_PTZ_FOCUSIN:
+            instruct[4] = 0x02;
+            break;
+    case PANandTILT_CTRL_PTZ_FOCUSOUT:
+            instruct[4] = 0x03;
+            break;
+    case PANandTILT_CTRL_PTZ_FOCUSSTOP:
+            break;
+    default:
+            instruct[3] = 0x38;
+            instruct[4] = 0x02;
+            break;
+    }
+    if (send_net_cmd(cam, instruct, sizeof(instruct)) != sizeof(instruct))
+            return FALSE;
+    else
+            return TRUE;
 }
 
 BOOL keepMove(Strategy_CamControl_t *cam,int type)
 {
-	char instruct[] = { 0x81, 0x01, 0x06, 0x01, cam->move_speed_pan, cam->move_speed_tilt, 0x00, 0x00, 0xFF };
-	switch (type){
-	case PANandTILT_CTRL_PTZ_STOP:
-		instruct[6] = 0x03;
-		instruct[7] = 0x03;
-		break;
-	case PANandTILT_CTRL_PTZ_UP:
-		instruct[6] = 0x03;
-		instruct[7] = 0x01;
-		break;
-	case PANandTILT_CTRL_PTZ_DOWN:
-		instruct[6] = 0x03;
-		instruct[7] = 0x02;
-		break;
-	case PANandTILT_CTRL_PTZ_LEFT:
-		instruct[6] = 0x01;
-		instruct[7] = 0x03;
-		break;
-	case PANandTILT_CTRL_PTZ_RIGHT:
-		instruct[6] = 0x02;
-		instruct[7] = 0x03;
-		break;
-	default:
-		instruct[6] = 0x03;
-		instruct[7] = 0x03;
-		break;
-	}
-	if (send_net_cmd(cam, instruct, sizeof(instruct)) != sizeof(instruct))
-		return FALSE;
-	else
-		return TRUE;
+    if(NULL==cam)
+    {
+        printf("NULL pointer!");
+        return FALSE;
+    }
+    char instruct[] = { 0x81, 0x01, 0x06, 0x01, cam->move_speed_pan, cam->move_speed_tilt, 0x00, 0x00, 0xFF };
+    switch (type){
+    case PANandTILT_CTRL_PTZ_STOP:
+            instruct[6] = 0x03;
+            instruct[7] = 0x03;
+            break;
+    case PANandTILT_CTRL_PTZ_UP:
+            instruct[6] = 0x03;
+            instruct[7] = 0x01;
+            break;
+    case PANandTILT_CTRL_PTZ_DOWN:
+            instruct[6] = 0x03;
+            instruct[7] = 0x02;
+            break;
+    case PANandTILT_CTRL_PTZ_LEFT:
+            instruct[6] = 0x01;
+            instruct[7] = 0x03;
+            break;
+    case PANandTILT_CTRL_PTZ_RIGHT:
+            instruct[6] = 0x02;
+            instruct[7] = 0x03;
+            break;
+    default:
+            instruct[6] = 0x03;
+            instruct[7] = 0x03;
+            break;
+    }
+    if (send_net_cmd(cam, instruct, sizeof(instruct)) != sizeof(instruct))
+            return FALSE;
+    else
+            return TRUE;
 }
 
 BOOL keepZoom(Strategy_CamControl_t *cam, int type)
 {
-	char instruct[] = { 0x81, 0x01, 0x04, 0x07, 0x00, 0xFF };
-	switch (type){
-	case PANandTILT_CTRL_PTZ_ZOOMIN:
-		instruct[4] = 0x02;
-		break;
-	case PANandTILT_CTRL_PTZ_ZOOMOUT:
-		instruct[4] = 0x03;
-		break;
-	case PANandTILT_CTRL_PTZ_ZOOMSTOP:
-		instruct[4] = 0x00;
-		break;
-	default:
-		instruct[4] = 0x03;
-		break;
-	}
-	if (send_net_cmd(cam, instruct, sizeof(instruct)) != sizeof(instruct))
-		return FALSE;
-	else
-		return TRUE;
+    if(NULL==cam)
+    {
+        printf("NULL pointer!");
+        return FALSE;
+    }
+    char instruct[] = { 0x81, 0x01, 0x04, 0x07, 0x00, 0xFF };
+    switch (type){
+    case PANandTILT_CTRL_PTZ_ZOOMIN:
+            instruct[4] = 0x02;
+            break;
+    case PANandTILT_CTRL_PTZ_ZOOMOUT:
+            instruct[4] = 0x03;
+            break;
+    case PANandTILT_CTRL_PTZ_ZOOMSTOP:
+            instruct[4] = 0x00;
+            break;
+    default:
+            instruct[4] = 0x03;
+            break;
+    }
+    if (send_net_cmd(cam, instruct, sizeof(instruct)) != sizeof(instruct))
+            return FALSE;
+    else
+            return TRUE;
 }
 
 BOOL getPosit(Strategy_CamControl_t *cam, int *posit_pan, int *posit_tilt, int waitMillisecond)
 {
-	char instruct[] = { 0x81, 0x09, 0x06, 0x12, 0xFF };
-	struct timeval tt;
-	gettimeofday(&tt, NULL);
-	struct timespec waitTime;
-	waitTime.tv_sec = tt.tv_sec + waitMillisecond / 1000;
-	waitTime.tv_nsec = tt.tv_usec * 1000 + (waitMillisecond % 1000) * 1000 * 1000;
+    if(NULL==cam)
+    {
+        printf("NULL pointer!");
+        return FALSE;
+    }
+    char instruct[] = { 0x81, 0x09, 0x06, 0x12, 0xFF };
+    struct timeval tt;
+    gettimeofday(&tt, NULL);
+    struct timespec waitTime;
+    waitTime.tv_sec = tt.tv_sec + waitMillisecond / 1000;
+    waitTime.tv_nsec = tt.tv_usec * 1000 + (waitMillisecond % 1000) * 1000 * 1000;
 
-	BOOL ret = FALSE;
-	pthread_mutex_lock(&cam->mutex1);
-	if (send_net_cmd(cam,instruct, sizeof(instruct)) == sizeof(instruct))
-	{
-		if (pthread_cond_timedwait(&cam->cond1, &cam->mutex1, &waitTime) != ETIMEDOUT)
-		{
-			*posit_pan = cam->m_posit_pan;
-			*posit_tilt = cam->m_posit_tilt;
-			ret = TRUE;
-		}
-	}
-	pthread_mutex_unlock(&cam->mutex1);
-	return ret;
+    BOOL ret = FALSE;
+    pthread_mutex_lock(&cam->mutex1);
+    if (send_net_cmd(cam,instruct, sizeof(instruct)) == sizeof(instruct))
+    {
+            if (pthread_cond_timedwait(&cam->cond1, &cam->mutex1, &waitTime) != ETIMEDOUT)
+            {
+                    *posit_pan = cam->m_posit_pan;
+                    *posit_tilt = cam->m_posit_tilt;
+                    ret = TRUE;
+            }
+    }
+    pthread_mutex_unlock(&cam->mutex1);
+    return ret;
 }
 
 BOOL getZoom(Strategy_CamControl_t *cam, int *zoomValue, int waitMillisecond)
 {
-	char instruct[] = { 0x81, 0x09, 0x04, 0x47, 0xFF };
-	struct timeval tt;
-	gettimeofday(&tt,NULL);
-	struct timespec waitTime;
-	waitTime.tv_sec = tt.tv_sec + waitMillisecond / 1000;
-	waitTime.tv_nsec = tt.tv_usec * 1000 + (waitMillisecond % 1000) * 1000 * 1000;
+    if(NULL==cam)
+    {
+        printf("NULL pointer!");
+        return FALSE;
+    }
+    char instruct[] = { 0x81, 0x09, 0x04, 0x47, 0xFF };
+    struct timeval tt;
+    gettimeofday(&tt,NULL);
+    struct timespec waitTime;
+    waitTime.tv_sec = tt.tv_sec + waitMillisecond / 1000;
+    waitTime.tv_nsec = tt.tv_usec * 1000 + (waitMillisecond % 1000) * 1000 * 1000;
 
-	BOOL ret = FALSE;
-	pthread_mutex_lock(&cam->mutex2);
-	if (send_net_cmd(cam, instruct, sizeof(instruct)) == sizeof(instruct))
-	{
-		if (pthread_cond_timedwait(&cam->cond2, &cam->mutex2, &waitTime) != ETIMEDOUT)
-		{
-			*zoomValue = cam->m_zoomValue;
-			ret = TRUE;
-		}
-	}
-	pthread_mutex_unlock(&cam->mutex2);
-	return ret;
+    BOOL ret = FALSE;
+    pthread_mutex_lock(&cam->mutex2);
+    if (send_net_cmd(cam, instruct, sizeof(instruct)) == sizeof(instruct))
+    {
+            if (pthread_cond_timedwait(&cam->cond2, &cam->mutex2, &waitTime) != ETIMEDOUT)
+            {
+                    *zoomValue = cam->m_zoomValue;
+                    ret = TRUE;
+            }
+    }
+    pthread_mutex_unlock(&cam->mutex2);
+    return ret;
 }
 
 //BOOL reBoot(Strategy_CamControl_t *cam)
@@ -455,24 +542,39 @@ BOOL getZoom(Strategy_CamControl_t *cam, int *zoomValue, int waitMillisecond)
 
 int recv_CameraInfo(Strategy_CamControl_t *cam, char* buffer)
 {
-	//int len = recvfrom(cam->m_send_socket, cam->m_buffer, sizeof(cam->m_buffer), 0,
-	//		(struct sockaddr*)&cam->m_addr, (socklen_t *)&cam->m_addr_len);
-	int len = recv(cam->m_send_socket, cam->m_buffer, sizeof(cam->m_buffer),0);
-	if (len > 0)
-	{
-		memcpy(buffer, cam->m_buffer, len);
-	}
-	return len;
+    if(NULL==cam||NULL==buffer)
+    {
+        printf("parameters is null!");
+        return FALSE;
+    }
+    //int len = recvfrom(cam->m_send_socket, cam->m_buffer, sizeof(cam->m_buffer), 0,
+    //		(struct sockaddr*)&cam->m_addr, (socklen_t *)&cam->m_addr_len);
+    int len = recv(cam->m_send_socket, cam->m_buffer, sizeof(cam->m_buffer),0);
+    if (len > 0)
+    {
+        memcpy(buffer, cam->m_buffer, len);
+    }
+    return len;
 }
 
 void set_CameraInfo_panTilt(Strategy_CamControl_t *cam, int posit_pan, int posit_tilt)
 {
-	cam->m_posit_pan = posit_pan;
-	cam->m_posit_tilt = posit_tilt;
+    if(NULL==cam)
+    {
+        printf("NULL pointer!");
+        return;
+    }
+    cam->m_posit_pan = posit_pan;
+    cam->m_posit_tilt = posit_tilt;
 }
 
 void set_CameraInfo_zoom(Strategy_CamControl_t *cam , int zoomValue)
 {
-	cam->m_zoomValue = zoomValue;
+    if(NULL==cam)
+    {
+        printf("NULL pointer!");
+        return;
+    }
+    cam->m_zoomValue = zoomValue;
 }
 

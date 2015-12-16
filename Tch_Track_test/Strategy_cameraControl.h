@@ -1,3 +1,5 @@
+//#include "stdafx.h"
+
 #ifndef STTATEGY_CAMERACONTROL_H
 #define STTATEGY_CAMERACONTROL_H
 
@@ -8,8 +10,8 @@
 #include <time.h>
 
 #ifdef WIN32
-	#include "WS2tcpip.h"
-    #pragma comment(lib, "ws2_32.lib")
+	//#include "WS2tcpip.h"
+    //#pragma comment(lib, "ws2_32.lib")
     #include "pthread.h"
 #else
     #include <pthread.h>
@@ -33,8 +35,14 @@ extern "C" {
 #define FALSE 0
 #endif
 
-typedef   int BOOL;
-typedef  void* HANDLE;
+#ifndef BOOL
+#define BOOL int
+#endif
+    
+#ifndef HANDLE
+#define HANDLE void*
+#endif
+
 
 ///UDP控制定义
 #define PANandTILT_CTRL_PTZ_STOP            0x1000
@@ -89,7 +97,7 @@ typedef struct CameraControl
 
 } Strategy_CamControl_t;
 
-int init_cam(Strategy_CamControl_t *cam);
+int init_cam(Strategy_CamControl_t *);
 int close_cam(Strategy_CamControl_t *cam);
 
 int startControl(Strategy_CamControl_t *cam,const char addr[], const int port);
@@ -117,5 +125,56 @@ void set_CameraInfo_zoom(Strategy_CamControl_t *cam,int zoomValue);
 #ifdef  __cplusplus  
 }
 #endif  /* end of __cplusplus */ 
+
+//class PanAndTiltCameraControl
+//{
+//public:
+//	PanAndTiltCameraControl();
+//	~PanAndTiltCameraControl();
+//	int startControl(const char addr[], const int port);
+//	void stopControl();
+//	BOOL getStart_Status();
+//
+//	void setMoveSpeed(int speed_pan, int speed_tilt);
+//	BOOL move(int posittion_pan, int posittion_tilt, int flag = TRUE);
+//	BOOL setZoom(int zoomPosition);
+//
+//	BOOL home();
+//	BOOL keepInstruct(int type, void* otherData = NULL);
+//	BOOL preset(int type, int id);
+//
+//	BOOL getPosit(int *posit_pan, int *posit_tilt, int waitMillisecond);
+//	BOOL getZoom(int *zoomValue, int waitMillisecond);
+//
+//	BOOL getRun_Status();
+//	int recv_CameraInfo(char* buffer);
+//	HANDLE m_hHandle1;
+//	HANDLE m_hHandle2;
+//	void set_CameraInfo_panTilt(int posit_pan, int posit_tilt);
+//	void set_CameraInfo_zoom(int zoomValue);
+//protected:
+//
+//private:
+//	BOOL m_flag_start;
+//
+//	struct sockaddr_in m_addr;
+//	char m_buffer[ACCEPT_BUFFER_SIZE];
+//	int m_addr_len;
+//	int m_send_socket;
+//
+//	int move_speed_pan;		//水平范围0-18
+//	int move_speed_tilt;	//倾斜范围0-14
+//	int send_net_cmd(char *cmd, int len);
+//
+//	BOOL keepMove(int type);
+//	BOOL keepZoom(int type);
+//	BOOL keepFocus(int type);
+//
+//	BOOL m_thread_run_flag;
+//	pthread_t heart_tid;
+//	int m_posit_pan;
+//	int m_posit_tilt;
+//	int m_zoomValue;
+//};
 
 #endif

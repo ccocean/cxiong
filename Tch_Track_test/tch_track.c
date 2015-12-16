@@ -1,13 +1,13 @@
 #include "tch_track.h"
 
-static Track_Point_t pos_1 = { -1 };
-static Track_Point_t pos_2 = { -1 };
+//static Track_Point_t pos_1 = { -1 };
+//static Track_Point_t pos_2 = { -1 };
 
-static void tchTrack_Copy_matData(Tch_Data_t* datas, itc_uchar* srcData)
+static void tchTrack_Copy_matData(Tch_Data_t* datas, itc_uchar* srcData, Track_Rect_t tch, Track_Rect_t blk)
 {
 	//ITC_FUNCNAME("FUNCNAME:stuTrack_resizeCopy_matData\n");
 	int y = 0;
-	int height = datas->g_frameSize.height;
+	//int height = datas->g_frameSize.height;
 	int dst_step = datas->g_frameSize.width;
 	int src_step = datas->sysData.width;
 	if (dst_step > src_step)
@@ -17,25 +17,33 @@ static void tchTrack_Copy_matData(Tch_Data_t* datas, itc_uchar* srcData)
 		return;
 	}
 
-	itc_uchar* dst_p = datas->srcMat->data.ptr;
+	/*itc_uchar* dst_p = datas->srcMat->data.ptr;
 	for (y = 0; y < height; y++)
 	{
 		memcpy(dst_p, srcData, sizeof(itc_uchar)* dst_step);
 		dst_p += dst_step;
 		srcData += src_step;
-	}
-}
+	}*/
 
-static void tchTrack_drawShow_imgData(Tch_Data_t* interior_params, itc_uchar* imageData, itc_uchar* bufferuv, Track_Rect_t *rect)
-{
-	Track_Size_t srcimg_size = { interior_params->sysData.width, interior_params->sysData.height };	//原始图像大小
-#ifdef _WIN32
-	int YUV420_type = TRACK_DRAW_YUV420P;
-#endif
-#ifndef _WIN32
-	int YUV420_type = TRACK_DRAW_YUV420SP;
-#endif
-	track_draw_rectangle(imageData, bufferuv, &srcimg_size, rect, &interior_params->yellow_colour, YUV420_type);
+	itc_uchar* dst_blk = datas->currMatBlk->data.ptr;
+	itc_uchar* src_blk = srcData + src_step*blk.y + blk.x;
+	for (y = 0; y < blk.height; y++)
+	{
+		memcpy(dst_blk, src_blk, sizeof(itc_uchar)* dst_step);
+		dst_blk += dst_step;
+		src_blk += src_step;
+	}
+
+	itc_uchar* dst_tch = datas->currMatTch->data.ptr;
+	itc_uchar* src_tch = srcData + src_step*tch.y + tch.x;
+
+	for (y = 0; y < tch.height; y++)
+	{
+		memcpy(dst_tch, src_tch, sizeof(itc_uchar)* dst_step);
+		dst_tch += dst_step;
+		src_tch += src_step;
+	}
+
 }
 
 int tch_trackInit(Tch_Data_t *data)
@@ -78,16 +86,12 @@ int tch_trackInit(Tch_Data_t *data)
 		ptr->index = i / data->track_pos_width;
 		ptr->left_pixel = i;
 		ptr->right_pixel = i + data->track_pos_width;
-		//printf("index:%d, left:%d, right:%d\r\n", ptr->index, ptr->left_pixel, ptr->right_pixel);
 		ptr++;
-		/*data->tempCams[i / data->track_pos_width].index = i / data->track_pos_width;
-		data->tempCams[i / data->track_pos_width].left_pixel = i;
-		data->tempCams[i / data->track_pos_width].right_pixel = i + data->track_pos_width;*/
 	}
 	
 	ptr = NULL;
 
-	data->srcMat = itc_create_mat(data->g_frameSize.height, data->g_frameSize.width, ITC_8UC1);
+	//data->srcMat = itc_create_mat(data->g_frameSize.height, data->g_frameSize.width, ITC_8UC1);
 
 	data->prevMatTch = itc_create_mat(data->g_tchWin.height, data->g_tchWin.width, ITC_8UC1);
 	data->prevMatBlk = itc_create_mat(data->g_blkWin.height, data->g_blkWin.width, ITC_8UC1);
@@ -110,14 +114,23 @@ int tch_trackInit(Tch_Data_t *data)
 	return 0;
 }
 
+static void tchTrack_drawShow_imgData(Tch_Data_t* interior_params, itc_uchar* imageData, itc_uchar* bufferuv, Track_Rect_t *rect, Track_Colour_t *color)
+{
+	Track_Size_t srcimg_size = { interior_params->sysData.width, interior_params ->sysData.height};	//原始图像大小
+#ifdef _WIN32
+	int YUV420_type = TRACK_DRAW_YUV420P;
+#endif
+#ifndef _WIN32
+	int YUV420_type = TRACK_DRAW_YUV420SP;
+#endif
+	track_draw_rectangle(imageData, bufferuv, &srcimg_size, rect, color, YUV420_type);
+}
+
 int tch_track(itc_uchar *src, itc_uchar* pUV, TeaITRACK_Params *params, Tch_Data_t *data, Tch_Result_t *res)
 //int tch_track(IplImage *src, TeaITRACK_Params *params, Tch_Data_t *data, Tch_Result_t *res)
 {
+
 	if (src==NULL || pUV==NULL|| params==NULL || data==NULL || res==NULL)
-	{
-		return -2;
-	}
-	if (data->srcMat->data.ptr == NULL)
 	{
 		return -2;
 	}
@@ -125,20 +138,17 @@ int tch_track(itc_uchar *src, itc_uchar* pUV, TeaITRACK_Params *params, Tch_Data
 	res->status = -1;
 	int i = 0, j = 0;
 
-#ifdef _WIN32
-	memcpy(data->srcMat->data.ptr, src, data->srcMat->step*data->srcMat->rows);
-#else
-	tchTrack_Copy_matData(data,src);
-#endif
+
 	if (data->g_count>0)
 	{
 		ITC_SWAP(data->currMatTch, data->prevMatTch, data->tempMatTch);
 		ITC_SWAP(data->currMatBlk, data->prevMatBlk, data->tempMatBlk);
 	}
-	track_copyImage_ROI(data->srcMat, data->currMatTch, data->g_tchWin);
-	track_copyImage_ROI(data->srcMat, data->currMatBlk, data->g_blkWin);
-	/*track_copyImage_ROI(src, data->currMatTch, data->g_tchWin);
-	track_copyImage_ROI(src, data->currMatBlk, data->g_blkWin);*/
+	tchTrack_Copy_matData(data, src, data->g_tchWin, data->g_blkWin);
+
+
+	tchTrack_drawShow_imgData(data, src, pUV, &data->g_tchWin,&data->red_colour);
+	tchTrack_drawShow_imgData(data, src, pUV, &data->g_blkWin, &data->red_colour);
 
 	int s_contourRectTch = 0;//老师的轮廓数目
 	int s_contourRectBlk = 0;//板书的轮廓数目
@@ -147,9 +157,7 @@ int tch_track(itc_uchar *src, itc_uchar* pUV, TeaITRACK_Params *params, Tch_Data
 	Track_Rect_t s_bigRects[100];//筛选出来的大面积运动物体
 	int s_maxdist = -1;//比较多个面积
 	int s_rectCnt = 0;
-	Track_Colour_t color = colour_RGB2YUV(255, 255, 0);
-	Track_Size_t imgSize = { 480, 264 };
-	
+	int isChange = -1;
 
 	if (data->g_count>0)
 	{
@@ -169,7 +177,7 @@ int tch_track(itc_uchar *src, itc_uchar* pUV, TeaITRACK_Params *params, Tch_Data
 		Track_Contour_t *contoursBlk = NULL;
 		itcClearMemStorage(data->storageBlk);
 		track_find_contours(data->maskMatBlk, &contoursBlk, data->storageBlk);
-		s_contourRectBlk = track_filtrate_contours(&contoursBlk, 20, s_rectsBlk);
+		s_contourRectBlk = track_filtrate_contours(&contoursBlk, 10, s_rectsBlk);
 		Track_Rect_t drawRect;
 
 		if (s_contourRectBlk > 0)
@@ -180,11 +188,13 @@ int tch_track(itc_uchar *src, itc_uchar* pUV, TeaITRACK_Params *params, Tch_Data
 				drawRect.y = s_rectsBlk[i].y + data->g_blkWin.y;
 				drawRect.width = s_rectsBlk[i].width;
 				drawRect.height = s_rectsBlk[i].height;
-				//track_draw_rectangle(src, pUV, &imgSize, &drawRect, &color, YUV420_type);
+				tchTrack_drawShow_imgData(data, src, pUV, &drawRect, &data->green_colour);
 			}
 			res->status = RETURN_TRACK_TCH_BLACKBOARD;
+			isChange = (res->status != data->tch_lastStatus);
+			data->tch_lastStatus = RETURN_TRACK_TCH_BLACKBOARD;
 			res->pos = data->pos_slide.center;
-			return RETURN_TRACK_TCH_BLACKBOARD;
+			return isChange;
 		}
 
 		//比较多个Rect之间x坐标的距离
@@ -207,32 +217,34 @@ int tch_track(itc_uchar *src, itc_uchar* pUV, TeaITRACK_Params *params, Tch_Data
 				{
 					res->pos = data->pos_slide.center;
 					res->status = RETURN_TRACK_TCH_MOVEINVIEW;
+					isChange = (res->status != data->tch_lastStatus);
 					data->tch_lastStatus = RETURN_TRACK_TCH_MOVEINVIEW;
-					return 1;
+					return isChange;
 				}
 				else
 				{
 					res->pos = data->pos_slide.center;
 					res->status = data->tch_lastStatus;
+					return STATUS_NONE;
 				}
 			}
 			else
 			{
 				res->pos = data->pos_slide.center;
 				res->status = data->tch_lastStatus;
+				return STATUS_NONE;
 			}
 		}
 		else if (s_rectCnt>1)
 		{
-			if (s_rectCnt > 2)
-			{
-				//printf(">2\r\n");
-			}
-			else
-				//printf("=2\r\n");
 			s_maxdist = -1;
 			for (i = 0; i < s_rectCnt; i++)
 			{
+				drawRect.x = s_bigRects[i].x + data->g_tchWin.x;
+				drawRect.y = s_bigRects[i].y + data->g_tchWin.y;
+				drawRect.width = s_bigRects[i].width;
+				drawRect.height = s_bigRects[i].height;
+				tchTrack_drawShow_imgData(data, src, pUV, &drawRect, &data->yellow_colour);
 				for (j = i + 1; j < s_rectCnt; j++)
 				{
 					if (abs(s_bigRects[i].x - s_bigRects[j].x)>s_maxdist)
@@ -247,11 +259,12 @@ int tch_track(itc_uchar *src, itc_uchar* pUV, TeaITRACK_Params *params, Tch_Data
 			{
 				//printf("=========");
 				data->g_isMulti = 1;
-				data->tch_lastStatus = RETURN_TRACK_TCH_MULITY;
 				res->status = RETURN_TRACK_TCH_MULITY;
+				isChange = (res->status != data->tch_lastStatus);
+				data->tch_lastStatus = RETURN_TRACK_TCH_MULITY;
 				res->pos = -1;
 				data->slideTimer.start = gettime();
-				return 1;
+				return isChange;
 			}
 		}
 		else
@@ -267,8 +280,8 @@ int tch_track(itc_uchar *src, itc_uchar* pUV, TeaITRACK_Params *params, Tch_Data
 				drawRect.y = s_bigRects[0].y + data->g_tchWin.y;
 				drawRect.width = s_bigRects[0].width;
 				drawRect.height = s_bigRects[0].height;
-				//tchTrack_drawShow_imgData(data, src, pUV, &drawRect);
-
+				tchTrack_drawShow_imgData(data, src, pUV, &drawRect, &data->yellow_colour);
+				
 				Tch_CamPosition_t *ptr;
 				ptr = data->cam_pos;
 				//获取当前运动框体所在的预置位
@@ -293,49 +306,28 @@ int tch_track(itc_uchar *src, itc_uchar* pUV, TeaITRACK_Params *params, Tch_Data
 				//printf("last position:%d,   current position:%d\r\n", data->g_prevPosIndex, data->g_posIndex);
 				if (abs(data->g_prevPosIndex - data->g_posIndex) > data->pos_slide.width + 1)
 				{
-					data->g_posIndex = data->g_prevPosIndex;
-					//data->g_prevPosIndex = data->g_posIndex;
-					data->tch_lastStatus = RETURN_TRACK_TCH_MULITY;
+					//data->g_posIndex = data->g_prevPosIndex;
+					data->g_prevPosIndex = data->g_posIndex;
 					res->status = RETURN_TRACK_TCH_MULITY;
+					isChange = (res->status != data->tch_lastStatus);
+					data->tch_lastStatus = RETURN_TRACK_TCH_MULITY;
 					res->pos = data->pos_slide.center;
 					data->tch_lastStatus = RETURN_TRACK_TCH_MULITY;
-					return 1;
+					return isChange;
 				}
-				/*else if (abs(data->g_prevPosIndex - data->g_posIndex)<data->pos_slide.width)
-				{
-					pos_1 = data->center;
-				}*/
-
-				//if (data->g_isMulti == 1)
-				//{
-				//	if (abs(data->g_prevPosIndex - data->g_posIndex) > data->pos_slide.width + 1)
-				//	{
-				//		//printf("++++++++");
-				//		data->g_posIndex = data->g_prevPosIndex;
-				//		//data->g_prevPosIndex = data->g_posIndex;
-				//		data->tch_lastStatus = RETURN_TRACK_TCH_MULITY;
-				//		res->status = RETURN_TRACK_TCH_MULITY;
-				//		res->pos = data->pos_slide.center;
-				//		data->tch_lastStatus = RETURN_TRACK_TCH_MULITY;
-				//		return 1;
-				//	}
-				//	else
-				//	{
-				//		data->g_isMulti = 0;
-				//	}
-				//}
 
 				//如果运动框体低于一定阈值，则认为走下讲台
 				if (data->center.y > params->threshold.outside)
 				//if (pos_1.y > params->threshold.outside)
 				{
-					data->tch_lastStatus = RETURN_TRACK_TCH_OUTSIDE;
 					res->status = RETURN_TRACK_TCH_OUTSIDE;
+					isChange = (res->status != data->tch_lastStatus);
+					data->tch_lastStatus = RETURN_TRACK_TCH_OUTSIDE;
 					res->pos = -1;
 					data->g_posIndex = -1;
 					data->g_prevPosIndex = -1;
 					data->tch_lastStatus = RETURN_TRACK_TCH_OUTSIDE;
-					return 1;
+					return isChange;
 				}
 
 				//更新位置
@@ -421,17 +413,19 @@ int tch_track(itc_uchar *src, itc_uchar* pUV, TeaITRACK_Params *params, Tch_Data
 
 				if ((data->slideTimer.deltaTime) > params->threshold.stand)
 				{
-					data->tch_lastStatus = RETURN_TRACK_TCH_MOVEINVIEW;
 					res->status = RETURN_TRACK_TCH_MOVEINVIEW;
+					isChange = (res->status != data->tch_lastStatus);
+					data->tch_lastStatus = RETURN_TRACK_TCH_MOVEINVIEW;
 					res->pos = data->pos_slide.center;
-					return 1;
+					return isChange;
 				}
 				else
 				{
-					data->tch_lastStatus = RETURN_TRACK_TCH_MOVEOUTVIEW;
 					res->status = RETURN_TRACK_TCH_MOVEOUTVIEW;
+					isChange = (res->status != data->tch_lastStatus);
+					data->tch_lastStatus = RETURN_TRACK_TCH_MOVEOUTVIEW;
 					res->pos = data->pos_slide.center;
-					return 1;
+					return isChange;
 				}
 			}
 			else
@@ -567,8 +561,6 @@ int tch_Init(TeaITRACK_Params *params, Tch_Data_t *data)
 	}
 	data->g_frameSize.width = params->frame.width;
 	data->g_frameSize.height = params->frame.height;
-	data->sysData.width = params->frame.width;
-	data->sysData.height = params->frame.height;
 	//初始化教师框
 	if (params->tch.width<0 || params->tch.height<0)
 	{
@@ -641,5 +633,14 @@ int tch_Init(TeaITRACK_Params *params, Tch_Data_t *data)
 	{
 		return -1;
 	}
+
+	//初始化绘制颜色
+	data->pink_colour = colour_RGB2YUV(255, 0, 255);	/*粉红*/
+	data->blue_colour = colour_RGB2YUV(0, 0, 255);		/*纯蓝*/
+	data->lilac_colour = colour_RGB2YUV(155, 155, 255);/*淡紫*/
+	data->green_colour = colour_RGB2YUV(0, 255, 0);	/*纯绿*/
+	data->red_colour = colour_RGB2YUV(255, 0, 0);		/*纯红*/
+	data->dullred_colour = colour_RGB2YUV(127, 0, 0);	/*暗红*/
+	data->yellow_colour = colour_RGB2YUV(255, 255, 0);	/*纯黄*/
 	return 0;
 }

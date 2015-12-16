@@ -20,10 +20,9 @@ extern "C" {
 
 
 #include "Strategy_Queue.h"
-#
 #include "Strategy_cameraControl.h"
-
-//
+#include <stdlib.h>
+	//
 
 #ifndef WIN32
 #include <mcfw/interfaces/ti_media_std.h>
@@ -32,33 +31,39 @@ extern "C" {
 #include <mcfw/interfaces/link_api/scdLink.h>
 #include "mainEnc_communtication.h"
 #include "public_mp.h"
-    
+
 #else
 #include "stuTrack_settings_parameter.h"
 #include "tch_params.h"
 #include "scdLink.h"
 #include "public_mp.h"
-    
-    //设置电影模式首画面
+
+	//设置电影模式首画面
 	typedef struct _HD_FIRSTPICTURE_MODE_S
-	{	
+	{
 		int option;//设置或者获取
 		int firstpicture;
 		int display_time;
 
 	}MainEnc_FirstPicMode_t;
-    
+
 #endif
 
+#define IP_ADDR_LEN 16
 #define FPS 25
 #define SWITCH_TIME 2000
+#define SWITCH_VGA_TIME 10000
 
 #define NULL_ACTIVITY 0
 #define TCH_ACTIVITY 1
 #define STU_ACTIVITY 2
 #define VGA_ACTIVITY 3
 
-//定义老师跟踪状态
+#define VGA_PARAMS 0
+#define TCH_PARAMS 1
+#define STU_PARAMS 2
+
+	//定义老师跟踪状态
 #define STRATEGY_TRACK_TCH_NULL 0
 #define STRATEGY_TRACK_TCH_STAND 1			//老师处在站立状态
 #define STRATEGY_TRACK_TCH_MOVEINVIEW 2		//老师在特写镜头内
@@ -76,69 +81,124 @@ extern "C" {
 #define STRATEGY_TRACK_VGA_NULL 0	//	VGA无信号
 #define STRATEGY_TRACK_VGA_ACTIVITY 1	//VGA有信号
 
-//计时器
-typedef struct StrategyTimer
-{
-	unsigned long start;
-	unsigned long finish;
-	double deltaTime;
-}Strategy_Timer_t;
+	//计时器
+	typedef struct StrategyTimer
+	{
+		unsigned long start;
+		unsigned long finish;
+		double deltaTime;
+	}Strategy_Timer_t;
 
-typedef struct Strategy_Result
-{
-        int result_activity;
-	int display_time;
-        int firstpicture;
-        
-	int VGA_flag;//VGA信号标志
-	int STU_flag;//学生信号标志
-	int TCH_flag;//教师信号标志
+	//typedef struct Strategy_Params
+	//{
+	//	AlgLink_ScdResult vga;//vga结构体
+	//	Tch_Result_t tch;//教师结果结构体
+	//	StuITRACK_OutParams_t stu;//学生结果结构体
+	//}Strategy_Params_t;
 
-	Strategy_Queue *tch_que;//教师序列分析
-	int tch_posIndex;//教师位置
-	int tch_status;//教师状态
+	typedef struct IP_PORT
+	{
+		char tch_ip[IP_ADDR_LEN];//教师相机的ip
+		char stu_ip[IP_ADDR_LEN];//学生相机的ip
+		int tch_port;//教师相机的端口
+		int stu_port;//学生相机的端口
+	}Strategy_IpPort_t;
 
-	TrackPrarms_Point_t stu_pos;//学生坐标
+	typedef struct Strategy_sysData
+	{
+		int result_activity;//录制初始画面标识符
+		int display_time;//初始画面持续时间
+		int firstpicture;//初始画面状态
 
-	int status;//画面状态的指令
-	int last_status;//上一次的画面状态
+		int status;//本次的画面状态
+		int last_status;//上一次画面状态
 
-	int posit_pan; //相机水平坐标
-	int posit_tilt; //相机垂直坐标
+		int VGA_flag;//VGA信号标志
+		int STU_flag;//学生信号标志
+		int TCH_flag;//教师信号标志
 
-	Strategy_Timer_t timer_stra;//计时器
+		//Strategy_Queue *tch_que;//教师序列分析
+		int tch_posIndex;//教师位置
+		int tch_status;//教师状态
 
-}Strategy_Result_t;
+		TrackPrarms_Point_t stu_pos;//学生坐标
 
-typedef struct Track_Strategy
-{
-        int isInit;
-	char *tch_ip;
-	char *stu_ip;
-	int tch_port;
-	int stu_port;
-	AlgLink_ScdResult *vga;//vga结构体
-	Tch_Result_t *tch;//教师结果结构体
-	StuITRACK_OutParams_t *stu;//学生结果结构体
-	Strategy_Result_t *stra;//决策结果结构体
-	Strategy_CamControl_t *tch_cam;//教师相机
-	Strategy_CamControl_t *stu_cam;//学生相机
-}Track_Strategy_t;
+		int posit_pan; //相机水平坐标
+		int posit_tilt; //相机垂直坐标
 
-/*
-tch: 为教师跟踪返回的结果；
-stu: 为学生跟踪返回的结果；
-stra: 为已经初始化了的决策器；
-cam_tch: 为控制教师特写镜头的控制器；
-cam_stu: 为控制学生特写镜头的控制器。
-*/
-//int switch_strategy(Tch_Result_t* tch, StuITRACK_OutParams_t* stu, Strategy_Result_t* stra, Strategy_CamControl_t *cam_tch);
+		Strategy_Timer_t timer_stra;//计时器
+		Strategy_Timer_t timer_vga;//vga计时器
 
-//初始化决策器
-//int init_strategy(Strategy_Result_t* stra);
+		Strategy_CamControl_t tch_cam;//教师相机
+		Strategy_CamControl_t stu_cam;//学生相机
 
-int track_strategy(Track_Strategy_t *track_stra);
-int first_PicMode(MainEnc_FirstPicMode_t *fpm, Track_Strategy_t *track_stra);
+		char tch_ip[IP_ADDR_LEN];//教师相机的ip
+		char stu_ip[IP_ADDR_LEN];//学生相机的ip
+		int tch_port;//教师相机的端口
+		int stu_port;//学生相机的端口
+
+		//Strategy_Params_t strat_info;//内部保存的参数状态
+
+	}Strategy_sysData_t;
+
+	/*==============================================================================
+		函数: <switch_strategy_vga>
+		功能: 更新VGA状态，判断策略
+		参数:track_stra :已经初始化的决策器，vga：vga参数
+		返回值:非0-决策代码   否则无决策
+	==============================================================================*/
+	int switch_strategy_vga(Strategy_sysData_t *sysData, AlgLink_ScdResult *vga);
+
+	/*==============================================================================
+	函数: <switch_strategy_tch>
+	功能: 更新TCH状态，判断策略
+	参数:track_stra :已经初始化的决策器，tch：教师参数
+	返回值:非0-决策代码   否则无决策
+	==============================================================================*/
+	int switch_strategy_tch(Strategy_sysData_t *sysData, Tch_Result_t *tch);
+
+	/*==============================================================================
+	函数: <switch_strategy_stu>
+	功能: 更新STU状态，判断策略
+	参数:track_stra :已经初始化的决策器，stu：学生参数
+	返回值:非0-决策代码   否则无决策
+	==============================================================================*/
+	int switch_strategy_stu(Strategy_sysData_t *sysData, StuITRACK_OutParams_t *stu);
+
+	/*==============================================================================
+		函数: <switch_strategy>
+		功能: 获取决策结果
+		参数:track_stra :已经初始化的决策器
+		返回值:非0-决策代码   否则无决策
+		==============================================================================*/
+	//int switch_strategy(Strategy_sysData_t *track_stra, Strategy_Params_t *stra_params ,int flag);
+
+	/*==============================================================================
+		函数: <init_track_strategy>
+		功能: 初始化决策器及
+		参数:track_stra :
+		返回值:0-成功   否则失败
+		==============================================================================*/
+	Strategy_sysData_t*  init_track_strategy(Strategy_IpPort_t ip_port);
+
+	/*==============================================================================
+		函数: <destroy_track_strategy>
+		功能: 摧毁决策器
+		参数:track_stra :
+		返回值:0-成功   否则失败
+		==============================================================================*/
+	int destroy_track_strategy(Strategy_sysData_t *track_stra);
+
+	/*==============================================================================
+		函数: <first_PicMode>
+		功能: 设置录制初始画面
+		参数:fpm :
+		int option;//设置或者获取
+		int firstpicture;//首画面类型
+		int display_time;//持续时间
+		返回值:0-成功   否则失败
+		==============================================================================*/
+	int first_PicMode(MainEnc_FirstPicMode_t *fpm, Strategy_sysData_t *track_stra);
 #ifdef __cplusplus
 }
 #endif

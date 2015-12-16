@@ -84,29 +84,26 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="public_mp.h" />
     <ClInclude Include="scdLink.h" />
-    <ClInclude Include="Strategy_cameraControl.h" />
     <ClInclude Include="itcCore.h" />
     <ClInclude Include="itcdatastructs.h" />
     <ClInclude Include="itcerror.h" />
     <ClInclude Include="itcTrack_draw_img.h" />
     <ClInclude Include="itctype.h" />
-    <ClInclude Include="Queue.h" />
+    <ClInclude Include="Strategy_cameraControl.h" />
     <ClInclude Include="stuTrack_settings_parameter.h" />
     <ClInclude Include="stuTrack_track_img.h" />
-    <ClInclude Include="switch_strategy.h" />
     <ClInclude Include="tch_params.h" />
     <ClInclude Include="tch_track.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="Strategy_cameraControl.c" />
     <ClCompile Include="itcCore.c" />
     <ClCompile Include="itcdatastructs.c" />
     <ClCompile Include="itcTrack_draw_img.c" />
     <ClCompile Include="main.c" />
-    <ClCompile Include="Queue.c" />
+    <ClCompile Include="Strategy_cameraControl.c" />
     <ClCompile Include="stuTrack_track_img.c" />
-    <ClCompile Include="switch_strategy.c" />
     <ClCompile Include="tch_track.c" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
